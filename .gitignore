@@ -1,0 +1,39 @@
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.pytest_cache/
+
+# Environment files
+.env
+.env.*
+
+# Allow example configuration
+!.env.example
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl.backup
+
+# Kubernetes secrets
+**/secret-values.yaml
+
+# OS
+.DS_Store
+Thumbs.db

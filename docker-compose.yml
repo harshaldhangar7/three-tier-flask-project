@@ -1,0 +1,145 @@
+
+services:
+
+  # ==================================
+  # DATABASE SERVICE
+  # ==================================
+
+  db:
+
+    image: mysql:8.4
+
+    container_name: student-db
+
+    restart: unless-stopped
+
+    environment:
+
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in root .env}
+
+      MYSQL_DATABASE: student_db
+
+      MYSQL_USER: flaskuser
+
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in root .env}
+
+    ports:
+
+      - "127.0.0.1:3307:3306"
+
+    volumes:
+
+      # Persistent database storage
+      - mysql_data:/var/lib/mysql
+
+      # Initialize database schema
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+
+    healthcheck:
+
+      test:
+        - CMD-SHELL
+        - 'mysqladmin ping -h 127.0.0.1 -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent'
+
+      interval: 10s
+
+      timeout: 5s
+
+      retries: 10
+
+      start_period: 30s
+
+
+  # ==================================
+  # BACKEND SERVICE
+  # ==================================
+
+  backend:
+
+    build:
+
+      context: ./backend
+
+      dockerfile: Dockerfile
+
+    image: student-backend:v1
+
+    container_name: student-backend
+
+    restart: unless-stopped
+
+    environment:
+
+      DB_HOST: db
+
+      DB_PORT: 3306
+
+      DB_USER: flaskuser
+
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in root .env}
+
+      DB_NAME: student_db
+
+      FLASK_DEBUG: "false"
+
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in root .env}
+
+    depends_on:
+
+      db:
+
+        condition: service_healthy
+
+    healthcheck:
+
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=3)"
+
+      interval: 15s
+
+      timeout: 5s
+
+      retries: 3
+
+      start_period: 15s
+
+
+  # ==================================
+  # FRONTEND SERVICE
+  # ==================================
+
+  frontend:
+
+    build:
+
+      context: ./frontend
+
+      dockerfile: Dockerfile
+
+    image: student-frontend:v1
+
+    container_name: student-frontend
+
+    restart: unless-stopped
+
+    ports:
+
+      - "8080:80"
+
+    depends_on:
+
+      backend:
+
+        condition: service_healthy
+
+
+# ==================================
+# PERSISTENT VOLUME
+# ==================================
+
+volumes:
+
+  mysql_data:

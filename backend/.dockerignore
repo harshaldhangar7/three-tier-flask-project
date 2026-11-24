@@ -1,0 +1,26 @@
+
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+.env.*
+
+# Allow example configuration if needed
+!.env.example
+
+# Test cache
+.pytest_cache/
+
+# Git
+.git/
+
+# IDE
+.vscode/
+
+# Logs
+*.log

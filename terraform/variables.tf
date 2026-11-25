@@ -40,3 +40,20 @@ variable "single_nat_gateway" {
   type        = bool
   default     = true
 }
+
+variable "cluster_endpoint_public_access_cidrs" {
+  description = "Your public IP in CIDR format, for example 203.0.113.10/32"
+  type        = list(string)
+}
+
+variable "db_username" {
+  description = "RDS master username"
+  type        = string
+  default     = "studentadmin"
+}
+
+variable "db_password" {
+  description = "RDS master password"
+  type        = string
+  sensitive   = true
+}

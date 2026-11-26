@@ -51,9 +51,3 @@ variable "db_username" {
   type        = string
   default     = "studentadmin"
 }
-
-variable "db_password" {
-  description = "RDS master password"
-  type        = string
-  sensitive   = true
-}

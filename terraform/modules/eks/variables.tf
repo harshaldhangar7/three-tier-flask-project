@@ -23,3 +23,15 @@ variable "cluster_endpoint_public_access_cidrs" {
   description = "Public IP ranges allowed to access the Kubernetes API"
   type        = list(string)
 }
+
+# RDS master credentials secret ARN.
+variable "rds_secret_arn" {
+  description = "ARN of the RDS master password secret"
+  type        = string
+}
+
+# Customer-managed KMS key ARN.
+variable "rds_secret_kms_key_arn" {
+  description = "KMS key ARN used for RDS secret encryption"
+  type        = string
+}

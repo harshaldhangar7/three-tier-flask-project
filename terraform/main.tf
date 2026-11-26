@@ -25,6 +25,7 @@ module "ecr" {
   environment  = var.environment
 }
 
+
 # -------------------------------
 # EKS MODULE
 # -------------------------------
@@ -35,15 +36,18 @@ module "eks" {
   cluster_name       = "${var.project_name}-${var.environment}"
   kubernetes_version = "1.37"
 
-  # Reuse the private app subnets created by networking module.
+  # Private application subnets.
   private_subnet_ids = module.networking.private_app_subnet_ids
 
   environment = var.environment
 
-  # Restrict Kubernetes API access to your public IP.
+  # Kubernetes API access restriction.
   cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
-}
 
+  # RDS Secrets Manager integration.
+  rds_secret_arn         = module.rds.master_secret_arn
+  rds_secret_kms_key_arn = module.rds.kms_key_arn
+}
 
 # --------------------------------------------------
 # RDS MYSQL MODULE
@@ -70,5 +74,5 @@ module "rds" {
 
   # Credentials
   db_username = var.db_username
-  db_password = var.db_password
+
 }

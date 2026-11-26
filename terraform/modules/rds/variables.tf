@@ -25,7 +25,7 @@ variable "allowed_app_cidr_blocks" {
 }
 
 variable "mysql_engine_version" {
-  description = "MySQL engine version"
+  description = "RDS MySQL engine version"
   type        = string
   default     = "8.0.46"
 }
@@ -45,10 +45,4 @@ variable "database_name" {
 variable "db_username" {
   description = "RDS administrator username"
   type        = string
-}
-
-variable "db_password" {
-  description = "RDS administrator password"
-  type        = string
-  sensitive   = true
 }

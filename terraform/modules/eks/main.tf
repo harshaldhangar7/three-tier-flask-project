@@ -181,3 +181,141 @@ resource "aws_eks_node_group" "main" {
     Project     = "student-management"
   }
 }
+
+# --------------------------------------------------
+# EKS POD IDENTITY AGENT ADD-ON
+# --------------------------------------------------
+
+resource "aws_eks_addon" "pod_identity_agent" {
+  cluster_name = aws_eks_cluster.main.name
+  addon_name   = "eks-pod-identity-agent"
+
+  depends_on = [
+    aws_eks_cluster.main,
+    aws_eks_node_group.main
+  ]
+}
+
+# --------------------------------------------------
+# BACKEND POD IDENTITY TRUST POLICY
+# --------------------------------------------------
+
+data "aws_iam_policy_document" "backend_pod_identity_assume_role" {
+
+  statement {
+    sid     = "AllowEKSBackendPodIdentity"
+    effect  = "Allow"
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+
+    # Only allow this EKS cluster.
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_eks_cluster.main.arn]
+    }
+
+    # Only allow the backend namespace.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/kubernetes-namespace"
+      values   = ["default"]
+    }
+
+    # Only allow the backend service account.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/kubernetes-service-account"
+      values   = ["backend-sa"]
+    }
+  }
+}
+
+# --------------------------------------------------
+# BACKEND IAM ROLE
+# --------------------------------------------------
+
+resource "aws_iam_role" "backend_secrets" {
+
+  name = "${var.cluster_name}-backend-secrets-role"
+
+  assume_role_policy = data.aws_iam_policy_document.backend_pod_identity_assume_role.json
+
+  tags = {
+    Environment = var.environment
+    Project     = "student-management"
+    Purpose     = "Backend RDS Secret Access"
+  }
+}
+
+# --------------------------------------------------
+# BACKEND SECRETS MANAGER PERMISSIONS
+# --------------------------------------------------
+
+data "aws_iam_policy_document" "backend_secrets" {
+
+  # Allow reading only the RDS master secret.
+  statement {
+    sid    = "ReadRDSSecret"
+    effect = "Allow"
+
+    actions = [
+      "secretsmanager:GetSecretValue"
+    ]
+
+    resources = [
+      var.rds_secret_arn
+    ]
+  }
+
+  # Allow decryption using the specific KMS key.
+  statement {
+  sid       = "DecryptRDSSecret"
+  effect    = "Allow"
+  actions   = ["kms:Decrypt"]
+  resources = [var.rds_secret_kms_key_arn]
+
+  condition {
+    test     = "StringEquals"
+    variable = "kms:ViaService"
+    values   = ["secretsmanager.ap-south-1.amazonaws.com"]
+  }
+
+  condition {
+    test     = "StringEquals"
+    variable = "kms:EncryptionContext:SecretARN"
+    values   = [var.rds_secret_arn]
+  }
+  }
+}
+
+resource "aws_iam_role_policy" "backend_secrets" {
+
+  name = "${var.cluster_name}-backend-secrets-policy"
+
+  role   = aws_iam_role.backend_secrets.id
+  policy = data.aws_iam_policy_document.backend_secrets.json
+}
+
+# --------------------------------------------------
+# EKS POD IDENTITY ASSOCIATION
+# --------------------------------------------------
+
+resource "aws_eks_pod_identity_association" "backend" {
+
+  cluster_name    = aws_eks_cluster.main.name
+  namespace       = "default"
+  service_account = "backend-sa"
+
+  role_arn = aws_iam_role.backend_secrets.arn
+
+  depends_on = [
+    aws_eks_addon.pod_identity_agent,
+    aws_iam_role_policy.backend_secrets
+  ]
+}
+

@@ -1,4 +1,3 @@
-
 output "vpc_id" {
   value = module.networking.vpc_id
 }
@@ -43,7 +42,6 @@ output "eks_node_group_name" {
   value = module.eks.node_group_name
 }
 
-
 # RDS MySQL endpoint
 output "db_endpoint" {
   description = "Complete RDS MySQL endpoint"
@@ -72,4 +70,14 @@ output "db_name" {
 output "db_security_group_id" {
   description = "RDS security group ID"
   value       = module.rds.db_security_group_id
+}
+
+output "db_master_secret_arn" {
+  description = "RDS master credentials secret ARN"
+  value       = module.rds.master_secret_arn
+}
+
+output "rds_secret_kms_key_arn" {
+  description = "KMS key ARN for RDS credentials"
+  value       = module.rds.kms_key_arn
 }

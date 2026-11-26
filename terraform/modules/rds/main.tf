@@ -1,16 +1,33 @@
 
 # --------------------------------------------------
+# KMS KEY FOR RDS MASTER PASSWORD
+# --------------------------------------------------
+
+resource "aws_kms_key" "rds_secret" {
+  description             = "KMS key for RDS master password in Secrets Manager"
+  enable_key_rotation     = true
+  deletion_window_in_days = 7
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-rds-secret-key"
+    Environment = var.environment
+  }
+}
+
+# Friendly alias for the KMS key
+resource "aws_kms_alias" "rds_secret" {
+  name          = "alias/${var.project_name}-${var.environment}-rds-secret"
+  target_key_id = aws_kms_key.rds_secret.key_id
+}
+
+# --------------------------------------------------
 # RDS DB SUBNET GROUP
 # --------------------------------------------------
 
 resource "aws_db_subnet_group" "main" {
-  # Name of the DB subnet group
-  name = "${var.project_name}-${var.environment}-db-subnet-group"
-
-  # Use the existing private database subnets
+  name       = "${var.project_name}-${var.environment}-db-subnet-group"
   subnet_ids = var.private_db_subnet_ids
 
-  # Add resource tags
   tags = {
     Name        = "${var.project_name}-${var.environment}-db-subnet-group"
     Environment = var.environment
@@ -22,27 +39,18 @@ resource "aws_db_subnet_group" "main" {
 # --------------------------------------------------
 
 resource "aws_security_group" "rds" {
-  # Security group name
-  name = "${var.project_name}-${var.environment}-rds-sg"
-
-  # Security group description
+  name        = "${var.project_name}-${var.environment}-rds-sg"
   description = "Allow MySQL access from private application subnets"
+  vpc_id      = var.vpc_id
 
-  # Attach security group to existing VPC
-  vpc_id = var.vpc_id
-
-  # Allow MySQL traffic from application subnet CIDRs
   ingress {
     description = "MySQL access from private application subnets"
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-
-    # Only the specified private application CIDRs
     cidr_blocks = var.allowed_app_cidr_blocks
   }
 
-  # Allow outbound traffic
   egress {
     from_port   = 0
     to_port     = 0
@@ -61,67 +69,47 @@ resource "aws_security_group" "rds" {
 # --------------------------------------------------
 
 resource "aws_db_instance" "mysql" {
-  # Unique RDS instance identifier
   identifier = "${var.project_name}-${var.environment}-mysql"
 
-  # Database engine and version
   engine         = "mysql"
   engine_version = var.mysql_engine_version
-
-  # Small instance for development and learning
   instance_class = var.db_instance_class
 
-  # Initial database name
-  db_name = var.database_name
-
-  # Database administrator username
+  db_name  = var.database_name
   username = var.db_username
 
-  # Password comes from a sensitive Terraform variable
-  password = var.db_password
+  # RDS generates and manages the master password.
+  # The password is stored in AWS Secrets Manager.
+  manage_master_user_password = true
 
-  # Allocate 20 GB of storage
-  allocated_storage = 20
+  # Encrypt the Secrets Manager secret using our KMS key.
+  master_user_secret_kms_key_id = aws_kms_key.rds_secret.arn
 
-  # Use General Purpose SSD storage
-  storage_type = "gp3"
-
-  # Do not allow storage to shrink
+  allocated_storage     = 20
+  storage_type          = "gp3"
   max_allocated_storage = 100
+  storage_encrypted     = true
 
-  # Encrypt database storage
-  storage_encrypted = true
-
-  # Use the private DB subnet group
-  db_subnet_group_name = aws_db_subnet_group.main.name
-
-  # Attach the RDS security group
+  db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  # Disable public internet access
   publicly_accessible = false
+  multi_az            = false
 
-  # Single-AZ deployment for development
-  multi_az = false
-
-  # Keep one day of automated backups
-  backup_retention_period = 1
-
-  # Automatically apply minor engine upgrades
+  backup_retention_period    = 1
   auto_minor_version_upgrade = true
 
-  # Enable deletion for this development database
   deletion_protection = false
-
-  # Skip final snapshot when destroying this development DB.
-  # IMPORTANT: destroying the instance will permanently delete its data.
   skip_final_snapshot = true
 
-  # Apply configuration changes immediately
   apply_immediately = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-mysql"
     Environment = var.environment
   }
+
+  depends_on = [
+    aws_kms_key.rds_secret
+  ]
 }

@@ -1,0 +1,81 @@
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: student-backend
+  namespace: default
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: student-backend
+
+  template:
+    metadata:
+      labels:
+        app: student-backend
+
+    spec:
+      # Use the ServiceAccount connected to EKS Pod Identity
+      serviceAccountName: backend-sa
+
+      containers:
+        - name: backend
+
+          # Backend image stored in AWS ECR
+          image: 531262218188.dkr.ecr.ap-south-1.amazonaws.com/student-management-backend-dev:v1
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 5000
+              name: http
+
+          # Database and AWS configuration
+          env:
+            - name: AWS_REGION
+              value: ap-south-1
+
+            - name: DB_SECRET_ARN
+              value: arn:aws:secretsmanager:ap-south-1:531262218188:secret:rds!db-10582cf4-9a57-49bc-9fd0-7d0b04fd1a4c-PPURUH
+
+            - name: DB_NAME
+              value: student_db
+
+            # Flask application secret
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-app-secret
+                  key: SECRET_KEY
+
+          # Check whether Flask is running
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Check whether Flask and MySQL are ready
+          readinessProbe:
+            httpGet:
+              path: /api/health/db
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
